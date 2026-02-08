@@ -118,9 +118,17 @@ func (api *DebankAPI) DebankBlock(ctx context.Context, blockNrOrHash rpc.BlockNu
 	)
 
 	for i, tx := range txs {
+		if i == 0 && api.eth.APIBackend.ChainConfig().Taiko {
+			if err := tx.MarkAsAnchor(); err != nil {
+				return nil, err
+			}
+		}
 		msg, err := core.TransactionToMessage(tx, signer, blockCtx.BaseFee)
 		if err != nil {
 			return nil, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
+		}
+		if api.eth.APIBackend.ChainConfig().IsOntake(block.Number()) {
+			msg.BasefeeSharingPctg = core.DecodeOntakeExtraData(block.Header().Extra)
 		}
 		statedb.SetTxContext(tx.Hash(), i)
 

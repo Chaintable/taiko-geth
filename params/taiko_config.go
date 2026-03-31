@@ -37,32 +37,16 @@ func u64(val uint64) *uint64 { return &val }
 
 // Network IDs
 var (
-	TaikoMainnetNetworkID     = big.NewInt(167000)
-	TaikoInternalL2ANetworkID = big.NewInt(167001)
-	TaikoInternalL2BNetworkID = big.NewInt(167002)
-	SnaefellsjokullNetworkID  = big.NewInt(167003)
-	AskjaNetworkID            = big.NewInt(167004)
-	GrimsvotnNetworkID        = big.NewInt(167005)
-	EldfellNetworkID          = big.NewInt(167006)
-	JolnirNetworkID           = big.NewInt(167007)
-	KatlaNetworkID            = big.NewInt(167008)
-	HeklaNetworkID            = big.NewInt(167009)
-	PreconfDevnetNetworkID    = big.NewInt(167010)
-	MasayaDevnetNetworkID     = big.NewInt(167011)
+	TaikoMainnetNetworkID  = big.NewInt(167000)
+	TaikoInternalNetworkID = big.NewInt(167001)
+	MasayaDevnetNetworkID  = big.NewInt(167011)
+	TaikoHoodiNetworkID    = big.NewInt(167013)
 )
 
 var networkIDToChainConfig = map[*big.Int]*ChainConfig{
 	TaikoMainnetNetworkID:      TaikoChainConfig,
-	TaikoInternalL2ANetworkID:  TaikoChainConfig,
-	TaikoInternalL2BNetworkID:  TaikoChainConfig,
-	SnaefellsjokullNetworkID:   TaikoChainConfig,
-	AskjaNetworkID:             TaikoChainConfig,
-	GrimsvotnNetworkID:         TaikoChainConfig,
-	EldfellNetworkID:           TaikoChainConfig,
-	JolnirNetworkID:            TaikoChainConfig,
-	KatlaNetworkID:             TaikoChainConfig,
-	HeklaNetworkID:             TaikoChainConfig,
-	PreconfDevnetNetworkID:     TaikoChainConfig,
+	TaikoInternalNetworkID:     TaikoChainConfig,
+	TaikoHoodiNetworkID:        TaikoChainConfig,
 	MasayaDevnetNetworkID:      TaikoChainConfig,
 	MainnetChainConfig.ChainID: MainnetChainConfig,
 	SepoliaChainConfig.ChainID: SepoliaChainConfig,
@@ -79,7 +63,7 @@ func NetworkIDToChainConfigOrDefault(networkID *big.Int) *ChainConfig {
 }
 
 var TaikoChainConfig = &ChainConfig{
-	ChainID:                 TaikoInternalL2ANetworkID, // Use Internal Devnet network ID by default.
+	ChainID:                 TaikoInternalNetworkID, // Use Internal Devnet network ID by default.
 	HomesteadBlock:          common.Big0,
 	EIP150Block:             common.Big0,
 	EIP155Block:             common.Big0,

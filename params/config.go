@@ -333,23 +333,16 @@ var (
 	}
 )
 
-// NetworkNames are user friendly names to use in the chain spec banner.
+// NetworkNames are user-friendly names to use in the chain spec banner.
 var NetworkNames = map[string]string{
 	MainnetChainConfig.ChainID.String(): "mainnet",
 	SepoliaChainConfig.ChainID.String(): "sepolia",
 	HoleskyChainConfig.ChainID.String(): "holesky",
 	// CHANGE(taiko): add Taiko network name.
-	TaikoMainnetNetworkID.String():     "Taiko",
-	TaikoInternalL2ANetworkID.String(): "Taiko Internal L2A Devnet",
-	TaikoInternalL2BNetworkID.String(): "Taiko Internal L2B Devnet",
-	SnaefellsjokullNetworkID.String():  "Taiko Alpha-1 (Snæfellsjökull)",
-	AskjaNetworkID.String():            "Taiko Alpha-2 (Askja)",
-	GrimsvotnNetworkID.String():        "Taiko Alpha-3 L2 (Grimsvotn)",
-	EldfellNetworkID.String():          "Taiko Alpha-4 L3 (Eldfell)",
-	JolnirNetworkID.String():           "Taiko Alpha-5 L2 (Jolnir)",
-	KatlaNetworkID.String():            "Taiko Alpha-6 L2 (Katla)",
-	HeklaNetworkID.String():            "Taiko Alpha-7 L2 (Hekla)",
-	PreconfDevnetNetworkID.String():    "Taiko Preconfirmation Devnet",
+	TaikoMainnetNetworkID.String():  "Taiko",
+	TaikoInternalNetworkID.String(): "Taiko Internal Devnet",
+	TaikoHoodiNetworkID.String():    "Taiko Hoodi L2",
+	MasayaDevnetNetworkID.String():  "Taiko Shared Devnet-Masaya",
 }
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -417,6 +410,7 @@ type ChainConfig struct {
 	Taiko       bool     `json:"taiko"`
 	OntakeBlock *big.Int `json:"ontakeBlock,omitempty"` // Ontake switch block (nil = no fork, 0 = already activated)
 	PacayaBlock *big.Int `json:"pacayaBlock,omitempty"` // Pacaya switch block (nil = no fork, 0 = already activated)
+	ShastaTime  *uint64  `json:"shastaTime,omitempty"`  // Shasta switch time (nil = no fork, 0 = already activated)
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -515,6 +509,20 @@ func (c *ChainConfig) Description() string {
 	}
 	if c.VerkleTime != nil {
 		banner += fmt.Sprintf(" - Verkle:                      @%-10v\n", *c.VerkleTime)
+	}
+	banner += "\n"
+
+	// CHANGE(taiko): add Taiko forks to banner.
+	banner += "Taiko network hard forks:\n"
+
+	if c.OntakeBlock != nil {
+		banner += fmt.Sprintf(" - Ontake:                      #%-8v\n", c.OntakeBlock)
+	}
+	if c.PacayaBlock != nil {
+		banner += fmt.Sprintf(" - Pacaya:                      #%-8v\n", c.PacayaBlock)
+	}
+	if c.ShastaTime != nil {
+		banner += fmt.Sprintf(" - Shasta:                      @%-10v\n", *c.ShastaTime)
 	}
 	return banner
 }
@@ -647,6 +655,11 @@ func (c *ChainConfig) IsOntake(num *big.Int) bool {
 // CHANGE(taiko): IsPacaya returns whether num is either equal to the Pacaya fork block or greater.
 func (c *ChainConfig) IsPacaya(num *big.Int) bool {
 	return isBlockForked(c.PacayaBlock, num)
+}
+
+// CHANGE(taiko): IsShasta returns whether time is either equal to the Shasta fork time or greater.
+func (c *ChainConfig) IsShasta(time uint64) bool {
+	return isTimestampForked(c.ShastaTime, time)
 }
 
 // IsVerkleGenesis checks whether the verkle fork is activated at the genesis block.

@@ -41,5 +41,7 @@ profile.cov
 
 # VS Code
 .vscode
+.code/
+.worktrees/
 
 tests/spec-tests/

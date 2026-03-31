@@ -441,9 +441,16 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 		if isTaiko {
 			// No need to check payloadAttribute here, because all its fields are
 			// marked as required.
+			var parentBlockTime uint64
+			if block.Number().Cmp(common.Big0) != 0 {
+				if ancestor := api.eth.BlockChain().GetHeaderByHash(block.ParentHash()); ancestor != nil {
+					parentBlockTime = block.Time() - ancestor.Time
+				}
+			}
 			block, err := api.eth.Miner().SealBlockWith(
-				update.HeadBlockHash,
+				block.Header(),
 				payloadAttributes.Timestamp,
+				parentBlockTime,
 				payloadAttributes.BlockMetadata,
 				payloadAttributes.BaseFeePerGas,
 				payloadAttributes.Withdrawals,
@@ -470,10 +477,12 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 				Withdrawals:  block.Withdrawals(),
 				Version:      payloadVersion,
 				TxListHash:   &txListHash,
+				Extra:        block.Header().Extra,
 			}
 			id := args.Id()
 
-			log.Debug("PayloadArgs",
+			log.Debug(
+				"Payload arguments",
 				"parent", args.Parent.Hex(),
 				"timestamp", args.Timestamp,
 				"feeRecipient", args.FeeRecipient.Hex(),
@@ -482,13 +491,21 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 				"version", args.Version,
 				"id", id.String(),
 				"txListHash", txListHash.Hex(),
+				"extra", args.Extra,
 			)
 
 			// If we already are busy generating this work, then we do not need
 			// to start a second process.
 			if api.localBlocks.has(id) {
-				// Write L1Origin even if the payload is already in the cache.
+				// Write L1Origin and HeadL1Origin even if the payload is already in the cache.
 				rawdb.WriteL1Origin(api.eth.ChainDb(), l1Origin.BlockID, l1Origin)
+				if !l1Origin.IsPreconfBlock() {
+					rawdb.WriteHeadL1Origin(api.eth.ChainDb(), l1Origin.BlockID)
+					// Write the batch to block mapping if the batch ID is given.
+					if payloadAttributes.BlockMetadata.BatchID != nil {
+						rawdb.WriteBatchToLastBlockID(api.eth.ChainDb(), payloadAttributes.BlockMetadata.BatchID, l1Origin.BlockID)
+					}
+				}
 				return valid(&id), nil
 			}
 			payload, err := api.eth.Miner().BuildPayload(args, false)
@@ -507,6 +524,10 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 			// Write the head L1Origin, only when it's not a preconfirmation block.
 			if !l1Origin.IsPreconfBlock() {
 				rawdb.WriteHeadL1Origin(api.eth.ChainDb(), l1Origin.BlockID)
+				// Write the batch to block mapping if the batch ID is given.
+				if payloadAttributes.BlockMetadata.BatchID != nil {
+					rawdb.WriteBatchToLastBlockID(api.eth.ChainDb(), payloadAttributes.BlockMetadata.BatchID, l1Origin.BlockID)
+				}
 			}
 
 			return valid(&id), nil

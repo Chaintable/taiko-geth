@@ -10,17 +10,20 @@ import (
 )
 
 var (
-	InternalDevnetOntakeBlock = new(big.Int).SetUint64(0)
-	PreconfDevnetOntakeBlock  = common.Big0
+	InternalDevnetOntakeBlock = common.Big0
 	MasayaDevnetOntakeBlock   = common.Big0
-	HeklaOntakeBlock          = new(big.Int).SetUint64(840_512)
+	TaikoHoodiOntakeBlock     = common.Big0
 	MainnetOntakeBlock        = new(big.Int).SetUint64(538_304)
 
-	InternalDevnetPacayaBlock = new(big.Int).SetUint64(0)
-	PreconfDevnetPacayaBlock  = common.Big0
+	InternalDevnetPacayaBlock = common.Big0
 	MasayaDevnetPacayaBlock   = common.Big0
-	HeklaPacayaBlock          = new(big.Int).SetUint64(1_299_888)
+	TaikoHoodiPacayaBlock     = common.Big0
 	MainnetPacayaBlock        = new(big.Int).SetUint64(1_166_000)
+
+	InternalShastaTime uint64 = 0
+	MasayaShastaTime   uint64 = 0
+	MainnetShastaTime  uint64 = 1_775_135_700
+	HoodiShastaTime    uint64 = 1_770_296_400
 )
 
 // TaikoGenesisBlock returns the Taiko network genesis block configs.
@@ -33,55 +36,33 @@ func TaikoGenesisBlock(networkID uint64) *Genesis {
 		chainConfig.ChainID = params.TaikoMainnetNetworkID
 		chainConfig.OntakeBlock = MainnetOntakeBlock
 		chainConfig.PacayaBlock = MainnetPacayaBlock
+		chainConfig.ShastaTime = &MainnetShastaTime
 		allocJSON = taikoGenesis.MainnetGenesisAllocJSON
-	case params.TaikoInternalL2ANetworkID.Uint64():
-		chainConfig.ChainID = params.TaikoInternalL2ANetworkID
+	case params.TaikoInternalNetworkID.Uint64():
+		chainConfig.ChainID = params.TaikoInternalNetworkID
 		chainConfig.OntakeBlock = InternalDevnetOntakeBlock
 		chainConfig.PacayaBlock = InternalDevnetPacayaBlock
-		allocJSON = taikoGenesis.InternalL2AGenesisAllocJSON
-	case params.TaikoInternalL2BNetworkID.Uint64():
-		chainConfig.ChainID = params.TaikoInternalL2BNetworkID
-		allocJSON = taikoGenesis.InternalL2BGenesisAllocJSON
-	case params.SnaefellsjokullNetworkID.Uint64():
-		chainConfig.ChainID = params.SnaefellsjokullNetworkID
-		allocJSON = taikoGenesis.SnaefellsjokullGenesisAllocJSON
-	case params.AskjaNetworkID.Uint64():
-		chainConfig.ChainID = params.AskjaNetworkID
-		allocJSON = taikoGenesis.AskjaGenesisAllocJSON
-	case params.GrimsvotnNetworkID.Uint64():
-		chainConfig.ChainID = params.GrimsvotnNetworkID
-		allocJSON = taikoGenesis.GrimsvotnGenesisAllocJSON
-	case params.EldfellNetworkID.Uint64():
-		chainConfig.ChainID = params.EldfellNetworkID
-		allocJSON = taikoGenesis.EldfellGenesisAllocJSON
-	case params.JolnirNetworkID.Uint64():
-		chainConfig.ChainID = params.JolnirNetworkID
-		allocJSON = taikoGenesis.JolnirGenesisAllocJSON
-	case params.KatlaNetworkID.Uint64():
-		chainConfig.ChainID = params.KatlaNetworkID
-		allocJSON = taikoGenesis.KatlaGenesisAllocJSON
-	case params.HeklaNetworkID.Uint64():
-		chainConfig.ChainID = params.HeklaNetworkID
-		chainConfig.OntakeBlock = HeklaOntakeBlock
-		chainConfig.PacayaBlock = HeklaPacayaBlock
-		allocJSON = taikoGenesis.HeklaGenesisAllocJSON
-	case params.PreconfDevnetNetworkID.Uint64():
-		chainConfig.ChainID = params.PreconfDevnetNetworkID
-		chainConfig.OntakeBlock = PreconfDevnetOntakeBlock
-		chainConfig.PacayaBlock = PreconfDevnetPacayaBlock
-		allocJSON = taikoGenesis.PreconfDevnetGenesisAllocJSON
+		chainConfig.ShastaTime = &InternalShastaTime
+		allocJSON = taikoGenesis.InternalGenesisAllocJSON
 	case params.MasayaDevnetNetworkID.Uint64():
 		chainConfig.ChainID = params.MasayaDevnetNetworkID
 		chainConfig.OntakeBlock = MasayaDevnetOntakeBlock
 		chainConfig.PacayaBlock = MasayaDevnetPacayaBlock
+		chainConfig.ShastaTime = &MasayaShastaTime
 		allocJSON = taikoGenesis.MasayaGenesisAllocJSON
+	case params.TaikoHoodiNetworkID.Uint64():
+		chainConfig.ChainID = params.TaikoHoodiNetworkID
+		chainConfig.OntakeBlock = TaikoHoodiOntakeBlock
+		chainConfig.PacayaBlock = TaikoHoodiPacayaBlock
+		chainConfig.ShastaTime = &HoodiShastaTime
+		allocJSON = taikoGenesis.TaikoHoodiGenesisAllocJSON
 	default:
-		chainConfig.ChainID = params.TaikoInternalL2ANetworkID
+		chainConfig.ChainID = params.TaikoInternalNetworkID
 		chainConfig.OntakeBlock = InternalDevnetOntakeBlock
 		chainConfig.PacayaBlock = InternalDevnetPacayaBlock
-		allocJSON = taikoGenesis.InternalL2AGenesisAllocJSON
+		chainConfig.ShastaTime = &InternalShastaTime
+		allocJSON = taikoGenesis.InternalGenesisAllocJSON
 	}
-
 	var alloc GenesisAlloc
 	if err := alloc.UnmarshalJSON(allocJSON); err != nil {
 		log.Crit("unmarshal alloc json error", "error", err)

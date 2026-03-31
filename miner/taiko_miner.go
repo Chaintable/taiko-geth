@@ -11,20 +11,21 @@ import (
 // PreBuiltTxList is a pre-built transaction list based on the latest chain state,
 // with estimated gas used / bytes.
 type PreBuiltTxList struct {
-	TxList           types.Transactions
-	EstimatedGasUsed uint64
-	BytesLength      uint64
+	TxList           types.Transactions `json:"txList"`
+	EstimatedGasUsed uint64             `json:"estimatedGasUsed"`
+	BytesLength      uint64             `json:"bytesLength"`
 }
 
 // SealBlockWith mines and seals a block without changing the canonical chain.
 func (miner *Miner) SealBlockWith(
-	parent common.Hash,
+	parent *types.Header,
 	timestamp uint64,
+	parentBlockTime uint64,
 	blkMeta *engine.BlockMetadata,
 	baseFeePerGas *big.Int,
 	withdrawals types.Withdrawals,
 ) (*types.Block, error) {
-	return miner.sealBlockWith(parent, timestamp, blkMeta, baseFeePerGas, withdrawals)
+	return miner.sealBlockWith(parent, timestamp, parentBlockTime, blkMeta, baseFeePerGas, withdrawals)
 }
 
 // BuildTransactionsLists builds multiple transactions lists which satisfy all the given limits.

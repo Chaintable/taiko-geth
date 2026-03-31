@@ -153,6 +153,10 @@ func generateTypeRef(goType reflect.Type) map[string]interface{} {
 			return map[string]interface{}{
 				"$ref": "#/definitions/*math.HexOrDecimal256",
 			}
+		case "*hexutil.Big":
+			return map[string]interface{}{
+				"$ref": "#/definitions/*hexutil.Big",
+			}
 		}
 	case reflect.Slice:
 		elem := goType.Elem()
@@ -272,11 +276,11 @@ func main() {
 			"*miner.PreBuiltTxList": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"TxList":           map[string]interface{}{"type": "array"},
-					"EstimatedGasUsed": map[string]interface{}{"type": "integer", "examples": []int{10000}},
-					"BytesLength":      map[string]interface{}{"type": "integer", "examples": []int{10000}},
+					"txList":           map[string]interface{}{"type": "array"},
+					"estimatedGasUsed": map[string]interface{}{"type": "integer", "examples": []int{10000}},
+					"bytesLength":      map[string]interface{}{"type": "integer", "examples": []int{10000}},
 				},
-				"required": []string{"TxList", "EstimatedGasUsed", "BytesLength"},
+				"required": []string{"txList", "estimatedGasUsed", "bytesLength"},
 			},
 			"*big.Int": map[string]interface{}{
 				"type":     "integer",
@@ -295,6 +299,11 @@ func main() {
 			"*math.HexOrDecimal256": map[string]interface{}{
 				"$ref":        "#/definitions/*big.Int",
 				"description": "Hexadecimal or decimal representation of a number.",
+			},
+			"*hexutil.Big": map[string]interface{}{
+				"type":        "string",
+				"description": "Hexadecimal representation of a big integer.",
+				"examples":    []string{"0x1234"},
 			},
 		},
 		Methods: map[string]Method{},

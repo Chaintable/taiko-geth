@@ -143,8 +143,6 @@ var (
 		utils.GpoPercentileFlag,
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
-		// CHANGE(taiko): add `--gpo.defaultprice` flag
-		utils.GpoDefaultGasPriceFlag,
 		configFileFlag,
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
@@ -260,6 +258,7 @@ func init() {
 	)
 	// CHANGE(taiko): append Taiko flags into the original GETH flags
 	app.Flags = append(app.Flags, &utils.TaikoFlag)
+	app.Flags = append(app.Flags, &utils.TaikoInternalShastaTimeFlag)
 
 	flags.AutoEnvVars(app.Flags, "GETH")
 

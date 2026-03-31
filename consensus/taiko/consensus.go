@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
@@ -40,8 +41,11 @@ var (
 	AnchorV3Selector = crypto.Keccak256(
 		[]byte("anchorV3(uint64,bytes32,uint32,(uint8,uint8,uint32,uint64,uint32),bytes32[])"),
 	)[:4]
-	AnchorGasLimit   = uint64(250_000)
-	AnchorV3GasLimit = uint64(1_000_000)
+	AnchorV4Selector = crypto.Keccak256(
+		[]byte("anchorV4((uint48,bytes32,bytes32))"),
+	)[:4]
+	AnchorGasLimit     = uint64(250_000)
+	AnchorV3V4GasLimit = uint64(1_000_000)
 )
 
 // Taiko is a consensus engine used by L2 rollup.
@@ -68,6 +72,21 @@ func New(chainConfig *params.ChainConfig, chainDB ethdb.Database) *Taiko {
 	}
 }
 
+// CHANGE(taiko): SetChainConfig updates chain config used by this engine and refreshes derived fields.
+func (t *Taiko) SetChainConfig(chainConfig *params.ChainConfig) {
+	if chainConfig == nil {
+		return
+	}
+	taikoL2AddressPrefix := strings.TrimPrefix(chainConfig.ChainID.String(), "0")
+	t.chainConfig = chainConfig
+	t.taikoL2Address = common.HexToAddress(
+		"0x" +
+			taikoL2AddressPrefix +
+			strings.Repeat("0", common.AddressLength*2-len(taikoL2AddressPrefix)-len(TaikoL2AddressSuffix)) +
+			TaikoL2AddressSuffix,
+	)
+}
+
 // check all method stubs for interface `Engine` without affect performance.
 var _ consensus.Engine = (*Taiko)(nil)
 
@@ -91,7 +110,7 @@ func (t *Taiko) VerifyHeader(chain consensus.ChainHeaderReader, header *types.He
 		return consensus.ErrUnknownAncestor
 	}
 	// Sanity checks passed, do a proper verification
-	return t.verifyHeader(header, parent, time.Now().Unix())
+	return t.verifyHeader(chain, header, parent, time.Now().Unix())
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
@@ -118,7 +137,7 @@ func (t *Taiko) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*type
 			if parent == nil {
 				err = consensus.ErrUnknownAncestor
 			} else {
-				err = t.verifyHeader(header, parent, unixNow)
+				err = t.verifyHeader(chain, header, parent, unixNow)
 			}
 			select {
 			case <-abort:
@@ -130,15 +149,22 @@ func (t *Taiko) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*type
 	return abort, results
 }
 
-func (t *Taiko) verifyHeader(header, parent *types.Header, unixNow int64) error {
+func (t *Taiko) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, unixNow int64) error {
 	// Ensure that the header's extra-data section is of a reasonable size (<= 32 bytes)
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 	}
 
-	// Timestamp should later than or equal to parent (when many L2 blocks included in one L1 block)
-	if header.Time < parent.Time {
-		return ErrOlderBlockTime
+	// Shasta fork enforces a strict timestamp increase, other forks allow equal
+	// timestamps (multiple L2 blocks per L1 block scenario).
+	if t.chainConfig.IsShasta(header.Time) {
+		if header.Time <= parent.Time {
+			return ErrOlderBlockTime
+		}
+	} else {
+		if header.Time < parent.Time {
+			return ErrOlderBlockTime
+		}
 	}
 
 	// Verify that the block number is parent's +1
@@ -169,6 +195,26 @@ func (t *Taiko) verifyHeader(header, parent *types.Header, unixNow int64) error 
 	// BaseFee should not be empty
 	if header.BaseFee == nil {
 		return ErrEmptyBasefee
+	}
+
+	// Verify the header's EIP-4396 attributes.
+	if t.chainConfig.IsShasta(header.Time) {
+		if len(header.Extra) < params.ShastaExtraDataLen {
+			return fmt.Errorf("Shasta extra-data too short: %d < %d", len(header.Extra), params.ShastaExtraDataLen)
+		}
+		if header.Number.Cmp(common.Big1) > 0 {
+			if ancestorBlock := chain.GetHeader(parent.ParentHash, parent.Number.Uint64()-1); ancestorBlock != nil {
+				if err := misc.VerifyEIP4396Header(t.chainConfig, parent, parent.Time-ancestorBlock.Time, header); err != nil {
+					return err
+				}
+			} else {
+				log.Warn(
+					"Skipping EIP-4396 verification due to unknown ancestor",
+					"parent", parent.Hash(),
+					"number", parent.Number,
+				)
+			}
+		}
 	}
 
 	// WithdrawalsHash should not be empty
@@ -295,44 +341,60 @@ func (t *Taiko) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, p
 	return common.Big0
 }
 
-// ValidateAnchorTx checks if the given transaction is a valid TaikoL2.anchor or TaikoL2.anchorV2 transaction.
+// ValidateAnchorTx checks if the given transaction is a valid TaikoL2.anchorV3 or Shasta Anchor.anchorV4 transaction.
 func (t *Taiko) ValidateAnchorTx(tx *types.Transaction, header *types.Header) (bool, error) {
 	if tx.Type() != types.DynamicFeeTxType {
+		log.Warn("Invalid transaction type", "type", tx.Type())
 		return false, nil
 	}
 
 	if tx.To() == nil || *tx.To() != t.taikoL2Address {
+		log.Warn("Invalid transaction to address", "to", tx.To())
 		return false, nil
 	}
 
-	if !bytes.HasPrefix(tx.Data(), AnchorSelector) &&
-		!bytes.HasPrefix(tx.Data(), AnchorV2Selector) &&
-		!bytes.HasPrefix(tx.Data(), AnchorV3Selector) {
-		return false, nil
+	if t.chainConfig.IsShasta(header.Time) {
+		if !bytes.HasPrefix(tx.Data(), AnchorV4Selector) {
+			log.Warn("Shasta: Invalid transaction data")
+			return false, nil
+		}
+	} else if t.chainConfig.IsPacaya(header.Number) {
+		if !bytes.HasPrefix(tx.Data(), AnchorV3Selector) {
+			log.Warn("Pacaya: Invalid transaction data")
+			return false, nil
+		}
+	} else {
+		if !bytes.HasPrefix(tx.Data(), AnchorSelector) && !bytes.HasPrefix(tx.Data(), AnchorV2Selector) {
+			log.Warn("Invalid transaction data")
+			return false, nil
+		}
 	}
 
 	if tx.Value().Cmp(common.Big0) != 0 {
+		log.Warn("Invalid transaction value", "value", tx.Value())
 		return false, nil
 	}
 
-	if t.chainConfig.IsPacaya(header.Number) {
-		if tx.Gas() != AnchorV3GasLimit {
+	if t.chainConfig.IsShasta(header.Time) || t.chainConfig.IsPacaya(header.Number) {
+		if tx.Gas() != AnchorV3V4GasLimit {
+			log.Warn("Shasta / Pacaya: Invalid transaction gas limit", "gas", tx.Gas())
 			return false, nil
 		}
 	} else {
 		if tx.Gas() != AnchorGasLimit {
+			log.Warn("Invalid transaction gas limit", "gas", tx.Gas())
 			return false, nil
 		}
 	}
 
 	if tx.GasFeeCap().Cmp(header.BaseFee) != 0 {
+		log.Warn("Invalid transaction gas fee cap", "gasFeeCap", tx.GasFeeCap(), "baseFee", header.BaseFee)
 		return false, nil
 	}
 
-	s := types.MakeSigner(t.chainConfig, header.Number, header.Time)
-
-	addr, err := s.Sender(tx)
+	addr, err := types.MakeSigner(t.chainConfig, header.Number, header.Time).Sender(tx)
 	if err != nil {
+		log.Warn("Invalid transaction sender", "err", err)
 		return false, err
 	}
 

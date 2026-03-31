@@ -58,7 +58,8 @@ type PayloadAttributes struct {
 
 // JSON type overrides for PayloadAttributes.
 type payloadAttributesMarshaling struct {
-	Timestamp hexutil.Uint64
+	Timestamp     hexutil.Uint64
+	BaseFeePerGas *hexutil.Big
 }
 
 //go:generate go run github.com/fjl/gencodec -type BlockMetadata -field-override blockMetadataMarshaling -out gen_blockmetadata.go
@@ -72,8 +73,9 @@ type BlockMetadata struct {
 	MixHash     common.Hash    `json:"mixHash"      gencodec:"required"`
 
 	// Extra fields required in taiko-geth.
-	TxList    []byte `json:"txList"          gencodec:"required"`
-	ExtraData []byte `json:"extraData"       gencodec:"required"`
+	BatchID   *big.Int `json:"batchId"`
+	TxList    []byte   `json:"txList"          gencodec:"required"`
+	ExtraData []byte   `json:"extraData"       gencodec:"required"`
 }
 
 // CHANGE(taiko): JSON type overrides for BlockMetadata.

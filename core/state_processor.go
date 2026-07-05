@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -149,12 +150,23 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 			hooks.OnTxStart(evm.GetVMContext(), tx, msg.From)
 		}
 		if hooks.OnTxEnd != nil {
-			defer func() { hooks.OnTxEnd(receipt, err) }()
+			defer func() {
+				receipt.SetEffectiveGasPrice(tx, evm.Context.BaseFee)
+				//if evm.Context.L1CostFunc != nil && !tx.IsDepositTx() && receipt.GasUsed > 0 {
+				//	l1Fee := evm.Context.L1CostFunc(tx.RollupCostData(), evm.Context.Time)
+				//	if l1Fee != nil && l1Fee.Cmp(common.Big0) > 0 {
+				//		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
+				//		receipt.EffectiveGasPrice = new(big.Int).Div(new(big.Int).Add(l1Fee, new(big.Int).Mul(receipt.EffectiveGasPrice, gasUsed)), gasUsed)
+				//	}
+				//}
+				hooks.OnTxEnd(receipt, err)
+			}()
 		}
 	}
 	// Apply the transaction to the current state (included in the env).
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
+		log.Error("Failed to apply transaction", "err", err, "block_number", blockNumber)
 		return nil, err
 	}
 	// Update the state with pending changes.
